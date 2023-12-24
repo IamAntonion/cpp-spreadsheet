@@ -14,24 +14,31 @@ using namespace std::literals;
 
 Sheet::~Sheet() {}
 
-void Sheet::SetCell(Position pos, std::string text) {
-    if (!pos.IsValid()) {
-        throw InvalidPositionException("SetCell for invalid position");
-    }
+void Sheet::ResizeRows(Position pos) {
     if (static_cast<size_t>(pos.row) >= values_.size()) {
         values_.resize(pos.row + 1);
     }
+}
+
+void Sheet::ResizeColumns(Position pos) {
     auto& row = values_[pos.row];
     if (static_cast<size_t>(pos.col) >= row.size()) {
         row.resize(pos.col + 1);
-        if (static_cast<size_t>(pos.col + 1) == width_) {
-            ++max_width_rows_;
-        }
-        if (static_cast<size_t>(pos.col + 1) > width_) {
-            width_ = pos.col + 1;
-            max_width_rows_ = 1;
-        }
+        UpdateWidth(pos);
     }
+}
+
+void Sheet::UpdateWidth(Position pos) {
+    if (static_cast<size_t>(pos.col + 1) == width_) {
+        ++max_width_rows_;
+    }
+    if (static_cast<size_t>(pos.col + 1) > width_) {
+        width_ = pos.col + 1;
+        max_width_rows_ = 1;
+    }
+}
+
+void Sheet::SetCellValue(Position pos, std::string text) {
     auto& cell_into = values_[pos.row][pos.col];
     if (!cell_into.cell) {
         cell_into = {std::make_unique<Cell>(*this), {}};
@@ -73,7 +80,10 @@ void Sheet::SetCell(Position pos, std::string text) {
         if (!values_[pоs.row][pоs.col].referenced_by->size()) {
             values_[pоs.row][pоs.col].referenced_by.reset();
         }
-    }    
+    }  
+}
+
+void Sheet::UpdateNewReferences(Position pos) {
     for (auto pоs : GetCell(pos)->GetReferencedCells()) {
         if (pоs.IsValid() && !GetCell(pоs)) {
             SetCell(pоs, std::string());
@@ -84,6 +94,9 @@ void Sheet::SetCell(Position pos, std::string text) {
         }
         values_[pоs.row][pоs.col].referenced_by->insert(pos);
     }
+}
+
+void Sheet::UpdateBackReferences(Position pos) {
     std::queue<Position> back_references;
     back_references.push(pos);
     while (!back_references.empty()) {
@@ -95,6 +108,17 @@ void Sheet::SetCell(Position pos, std::string text) {
             }
         }
     }
+}
+
+void Sheet::SetCell(Position pos, std::string text) {
+    if (!pos.IsValid()) {
+        throw InvalidPositionException("SetCell for invalid position");
+    }
+    ResizeRows(pos);
+    ResizeColumns(pos);
+    SetCellValue(pos, text);
+    UpdateNewReferences(pos);
+    UpdateBackReferences(pos);
 }
 
 const CellInterface* Sheet::GetCell(Position pos) const {
@@ -120,61 +144,72 @@ CellInterface* Sheet::GetCell(Position pos) {
     return values_[pos.row][pos.col].cell.get();
 }
 
-void Sheet::ClearCell(Position pos) {
-    if (!pos.IsValid()) {
-        throw InvalidPositionException("ClearCell for invalid position");
-    }
-    if (static_cast<size_t>(pos.row) >= values_.size()) {
-        return;
-    }
-    auto& row = values_[pos.row];
-    if (static_cast<size_t>(pos.col) >= row.size()) {
-        return;
-    }
-    if (row[pos.col].referenced_by && row[pos.col].referenced_by->size()) {
-        row[pos.col].cell->Set(std::string());
-        return;
-    }
-    if (static_cast<size_t>(pos.col + 1) < row.size()) {
-        row[pos.col].cell.reset();
-        return;
-    }
-    row[pos.col].cell.reset();
-    size_t old_col_length = row.size();
-    size_t new_col_length = old_col_length - 1;
-    while (new_col_length > 0 && !row[new_col_length - 1].cell) {
-        --new_col_length;
-    }
-    row.resize(new_col_length);
-    if (!new_col_length) {
-        if (static_cast<size_t>(pos.row + 1) == values_.size()) {
-            size_t new_row_length = values_.size() - 1;
-            while (new_row_length > 0 && !values_[new_row_length - 1].size()) {
-                --new_row_length;
-            }
-            values_.resize(new_row_length);
-        }
-    }
-    if (old_col_length != width_) {
-        return;
-    }
-    if (--max_width_rows_) {
-        return;
-    }
-    size_t new_width = 0, new_max_width_rows = 0;
-    for (auto& row : values_) {
-        if (row.size() < new_width) {
-            continue;
-        }
-        if (row.size() == new_width) {
-            ++new_max_width_rows;
-            continue;
-        }
-        new_width = row.size();
-        new_max_width_rows = 1;
-    }
-    width_ = new_width;
-    max_width_rows_ = new_max_width_rows;
+void Sheet::DeleteCellAndResize(Position pos, std::vector<CellInfo>& row) {
+    size_t new_col_length = row.size() - 1; 
+    while (new_col_length > 0 && !row[new_col_length - 1].cell) { 
+        --new_col_length; 
+    } 
+    row.resize(new_col_length); 
+    if (!new_col_length) { 
+        if (static_cast<size_t>(pos.row + 1) == values_.size()) { 
+            size_t new_row_length = values_.size() - 1; 
+            while (new_row_length > 0 && !values_[new_row_length - 1].size()) { 
+                --new_row_length; 
+            } 
+            values_.resize(new_row_length); 
+        } 
+    } 
+}
+
+void Sheet::UpdateWidthAndMaxRowsValues() {
+    size_t new_width = 0, new_max_width_rows = 0; 
+    for (auto& row : values_) { 
+        if (row.size() < new_width) { 
+            continue; 
+        } 
+        if (row.size() == new_width) { 
+            ++new_max_width_rows; 
+            continue; 
+        } 
+        new_width = row.size(); 
+        new_max_width_rows = 1; 
+    } 
+    width_ = new_width; 
+    max_width_rows_ = new_max_width_rows; 
+}
+
+void Sheet::ClearCell(Position pos) { 
+    if (!pos.IsValid()) { 
+        throw InvalidPositionException("ClearCell for invalid position"); 
+    } 
+    if (static_cast<size_t>(pos.row) >= values_.size()) { 
+        return; 
+    } 
+    auto& row = values_[pos.row]; 
+    if (static_cast<size_t>(pos.col) >= row.size()) { 
+        return; 
+    } 
+    if (row[pos.col].referenced_by && row[pos.col].referenced_by->size()) { 
+        row[pos.col].cell->Set(std::string()); 
+        return; 
+    } 
+    if (static_cast<size_t>(pos.col + 1) < row.size()) { 
+        row[pos.col].cell.reset(); 
+        return; 
+    } 
+    
+    row[pos.col].cell.reset(); 
+    size_t old_col_length = row.size(); 
+    DeleteCellAndResize(pos, row);
+    
+    if (old_col_length != width_) { 
+        return; 
+    } 
+    if (--max_width_rows_) { 
+        return; 
+    } 
+    
+    UpdateWidthAndMaxRowsValues();
 }
 
 Size Sheet::GetPrintableSize() const {

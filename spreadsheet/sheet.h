@@ -37,4 +37,14 @@ private:
     std::vector<std::vector<CellInfo>> values_;
     size_t width_ = 0;
     size_t max_width_rows_ = 0;
+    
+    void ResizeRows(Position pos);
+    void ResizeColumns(Position pos);
+    void UpdateWidth(Position pos);
+    void SetCellValue(Position pos, std::string text);
+    void UpdateNewReferences(Position pos);
+    void UpdateBackReferences(Position pos);
+    
+    void DeleteCellAndResize(Position pos, std::vector<CellInfo>& row);
+    void UpdateWidthAndMaxRowsValues();
 };
