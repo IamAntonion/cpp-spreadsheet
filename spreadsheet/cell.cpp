@@ -18,7 +18,7 @@ Cell::Cell(Sheet& sheet) : sheet_(sheet) {}
 Cell::~Cell() {}
 
 void Cell::Clear() {
-    thіs = EmptyCell{};
+    calculated_formula = EmptyCell{};
 }
 
 bool Cell::ClearCache() const {
@@ -33,7 +33,7 @@ bool Cell::ClearCache() const {
         },
         [](auto&) -> bool { return false; } // Это не формула, нечего очищать.
     },
-    thіs);
+    calculated_formula);
 }
 
 bool Cell::HasValue() const {
@@ -41,7 +41,7 @@ bool Cell::HasValue() const {
         [](const FormulaCell& cell) -> bool { return cell.value.has_value(); },
         [](auto&) -> bool { return false; } // Это не формула, нечего обновлять.
     },
-    thіs);
+    calculated_formula);
 }
 
 Cell::Value Cell::GetValue() const {
@@ -59,7 +59,7 @@ Cell::Value Cell::GetValue() const {
             return *cell.value;
         }
     },
-    thіs);
+    calculated_formula);
 }
 
 std::string Cell::GetText() const {
@@ -70,7 +70,7 @@ std::string Cell::GetText() const {
             return "=" + cell.formula->GetExpression();
         }
     },
-    thіs);
+    calculated_formula);
 }
 
 const std::vector<Position>& Cell::GetReferencedCells() const {
@@ -83,5 +83,5 @@ const std::vector<Position>& Cell::GetReferencedCells() const {
             return empty;
         }
     },
-    thіs);
+    calculated_formula);
 }

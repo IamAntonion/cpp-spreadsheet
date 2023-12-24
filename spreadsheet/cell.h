@@ -44,23 +44,23 @@ private:
     };
     Sheet& sheet_;
     // Используем sheet для вычисления формулы в момент создания ячейки.
-    std::variant<EmptyCell, TextCell, FormulaCell> thіs = EmptyCell{};
+    std::variant<EmptyCell, TextCell, FormulaCell> calculated_formula = EmptyCell{};
 };
 
 template <typename VerifyFormula>
 void Cell::Set(std::string text, VerifyFormula verify_formula) {
     if (text.empty()) {
-        thіs = EmptyCell{};
+        calculated_formula = EmptyCell{};
     } else if (text[0] == '\'') {
         std::string value = text.substr(1);
-        thіs = TextCell{std::move(text), std::move(value)};
+        calculated_formula = TextCell{std::move(text), std::move(value)};
     } else if (text == "=") {
-        thіs = TextCell{"=", "="};
+        calculated_formula = TextCell{"=", "="};
     } else if (text[0] == '=') {
         std::unique_ptr<FormulaInterface> formula = ParseFormula(text.substr(1));
         verify_formula(*formula);
-        thіs = FormulaCell{std::move(formula), {}};
+        calculated_formula = FormulaCell{std::move(formula), {}};
     } else {
-        thіs = TextCell{text, std::move(text)};
+        calculated_formula = TextCell{text, std::move(text)};
     }
 }
